@@ -1,0 +1,420 @@
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Upload, Scissors, Box, BrainCircuit,
+  GitMerge, FileCode, Code2, FileType, Database, FlaskConical,
+  ShieldCheck, PackageCheck
+} from "lucide-react";
+import { SlideProps } from "../types";
+
+const N = 4;
+const NODE_R = 30;
+
+const C = {
+  intake:  { color: "#06b6d4", glow: "rgba(6,182,212,0.45)"   },
+  split:   { color: "#818cf8", glow: "rgba(129,140,248,0.45)" },
+  unit:    { color: "#38bdf8", glow: "rgba(56,189,248,0.4)"   },
+  ai:      { color: "#f59e0b", glow: "rgba(245,158,11,0.45)"  },
+  merge:   { color: "#34d399", glow: "rgba(52,211,153,0.5)"   },
+  qa:      { color: "#f472b6", glow: "rgba(244,114,182,0.45)" },
+  product: { color: "#a78bfa", glow: "rgba(167,139,250,0.5)"  },
+};
+
+/* ── node ids ──
+   0        = Intake
+   1        = Splitting Agent
+   2…N+1    = Work Units
+   N+2      = Coding AI Assistant (single)
+   N+3      = Code Repository
+   N+4      = QA AI Engine
+   N+5      = Product
+── */
+const INTAKE_ID  = 0;
+const SPLIT_ID   = 1;
+const unitId     = (i: number) => 2 + i;
+const AI_ID      = 2 + N;
+const MERGE_ID   = 2 + N + 1;
+const QA_ID      = 2 + N + 2;
+const PRODUCT_ID = 2 + N + 3;
+
+const X_INTAKE  = 4;
+const X_SPLIT   = 15;
+const X_UNIT    = 33;
+const X_AI      = 58;
+const X_MERGE   = 71;
+const X_QA      = 83;
+const X_PRODUCT = 94;
+
+const rowY = (i: number): number => {
+  if (i === 0) return 10;
+  if (i === 1) return 30;
+  if (i === 2) return 58;
+  return 82;
+};
+
+type NodeDef = {
+  id: number; icon: React.ElementType; label: string; tag: string;
+  color: string; glow: string; xPct: number; yPct: number; tooltip?: string;
+};
+
+const NODES: NodeDef[] = [
+  { id: INTAKE_ID, icon: Upload,       label: "User Story\n+ Design Intake", tag: "INPUT",
+    ...C.intake, xPct: X_INTAKE - 1, yPct: 38, tooltip: "Upload User Story & Design" },
+  { id: SPLIT_ID,  icon: Scissors,     label: "Splitting\nAgent",            tag: "SPLIT",
+    ...C.split,  xPct: X_SPLIT,      yPct: 75, tooltip: "Logically splits into independent units" },
+  ...Array.from({ length: N }, (_, i) => ({
+    id: unitId(i), icon: Box, label: `Unit ${i + 1}`, tag: `WU-${String(i+1).padStart(2,"0")}`,
+    ...C.unit, xPct: X_UNIT, yPct: rowY(i),
+  })),
+  { id: AI_ID,      icon: BrainCircuit, label: "Coding AI\nAssistant",       tag: "AI+TEST",
+    ...C.ai,     xPct: X_AI,           yPct: 50, tooltip: "Generates code + runs automated tests" },
+  { id: MERGE_ID,   icon: GitMerge,     label: "Code\nRepository",           tag: "REPO",
+    ...C.merge,  xPct: X_MERGE,        yPct: 50 },
+  { id: QA_ID,      icon: ShieldCheck,  label: "QA AI\nEngine",              tag: "QA",
+    ...C.qa,     xPct: X_QA,           yPct: 50, tooltip: "Automated quality assurance & regression" },
+  { id: PRODUCT_ID, icon: PackageCheck, label: "Product",                    tag: "LIVE",
+    ...C.product, xPct: X_PRODUCT,     yPct: 50 },
+];
+
+type EdgeDef = { id: string; from: number; to: number; label?: string; lc?: string };
+
+const EDGES: EdgeDef[] = [
+  { id: "e_in_sp",  from: INTAKE_ID, to: SPLIT_ID, label: "User Story",  lc: C.intake.color },
+  { id: "e_in_ai",  from: INTAKE_ID, to: AI_ID,    label: "Design Docs", lc: C.intake.color },
+  ...Array.from({ length: N }, (_, i) => ({
+    id: `e_sp_u${i}`, from: SPLIT_ID, to: unitId(i), label: "Spec .md", lc: C.split.color,
+  })),
+  ...Array.from({ length: N }, (_, i) => ({
+    id: `e_u_ai${i}`, from: unitId(i), to: AI_ID, label: "Bundle", lc: C.unit.color,
+  })),
+  { id: "e_ai_repo", from: AI_ID,    to: MERGE_ID,   label: "Tested",    lc: C.ai.color    },
+  { id: "e_repo_qa", from: MERGE_ID, to: QA_ID,      label: "Code",      lc: C.merge.color },
+  { id: "e_qa_prod", from: QA_ID,    to: PRODUCT_ID, label: "Approved",  lc: C.qa.color    },
+];
+
+const UNIT_INPUTS = [
+  { icon: FileCode,  label: "Spec .md",        color: "#818cf8" },
+  { icon: Code2,     label: "DSL YAML",         color: "#38bdf8" },
+  { icon: FileType,  label: "Design Docs",      color: "#06b6d4" },
+  { icon: Database,  label: "Knowledge Fabric", color: "#a78bfa" },
+];
+
+const AI_ITEMS = [
+  { icon: BrainCircuit, label: "Code Gen",     color: "#f59e0b" },
+  { icon: FlaskConical, label: "Auto Testing", color: "#34d399" },
+];
+
+function TravelDot({ x1, y1, x2, y2, color }: { x1:number; y1:number; x2:number; y2:number; color:string }) {
+  return (
+    <circle r={2.8} fill={color} style={{ filter: `drop-shadow(0 0 4px ${color})` }}>
+      <animateMotion dur="1.6s" repeatCount="indefinite" path={`M${x1} ${y1} L${x2} ${y2}`} />
+    </circle>
+  );
+}
+
+export default function SlideCodeDevelopment({ isActive }: SlideProps) {
+  const [active, setActive]   = useState(0);
+  const [autoRun, setAutoRun] = useState(true);
+  const [hovered, setHovered] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dim, setDim] = useState({ w: 900, h: 420 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setDim({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    setDim({ w: el.clientWidth, h: el.clientHeight });
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isActive || !autoRun) return;
+    const t = setInterval(() => setActive(p => (p + 1) % NODES.length), 2000);
+    return () => clearInterval(t);
+  }, [isActive, autoRun]);
+
+  if (!isActive) return null;
+
+  const cpx = (p: number) => (p / 100) * dim.w;
+  const cpy = (p: number) => (p / 100) * dim.h;
+
+  const pos: Record<number, { cx: number; cy: number }> = {};
+  NODES.forEach(n => { pos[n.id] = { cx: cpx(n.xPct), cy: cpy(n.yPct) }; });
+
+  const liveEdge    = (e: EdgeDef) => e.from === active  || e.to === active;
+  const relatedEdge = (e: EdgeDef) => e.from === hovered || e.to === hovered;
+  const activeNode  = NODES.find(n => n.id === active)!;
+
+  return (
+    <div className="relative w-full h-full flex flex-col justify-between p-5 md:p-8 select-none bg-gradient-to-b from-[#030303] via-[#07070b] to-[#030303] overflow-hidden">
+
+      {/* Ambient glow */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <motion.div className="absolute rounded-full blur-[130px]"
+          animate={{
+            left: `${pos[active]?.cx ?? cpx(50)}px`,
+            top:  `${pos[active]?.cy ?? cpy(50)}px`,
+            background: `radial-gradient(circle, ${activeNode.glow} 0%, transparent 65%)`,
+          }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          style={{ width: 440, height: 440, transform: "translate(-50%,-50%)" }} />
+        <div className="grid-bg absolute inset-0 opacity-[0.12]" />
+      </div>
+
+      {/* Header */}
+      <div className="relative z-10 space-y-0.5">
+        <motion.div initial={{ opacity:0, y:-10 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.6 }}
+          className="flex items-center space-x-2">
+          <span className="h-px w-7 bg-gradient-to-r from-indigo-500 to-transparent" />
+          <span className="text-[10px] font-mono tracking-[0.3em] font-semibold text-indigo-400 uppercase">
+            Phase 04 — Governed AI Workflow
+          </span>
+        </motion.div>
+        <motion.h1 initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.6, delay:0.08 }}
+          className="text-2xl md:text-3xl font-display font-light tracking-tight text-white">
+          AI-SDLC{" "}
+          <span className="font-semibold bg-gradient-to-r from-white via-indigo-100 to-indigo-400 bg-clip-text text-transparent">
+            Node Workflow
+          </span>
+        </motion.h1>
+      </div>
+
+      {/* Graph canvas */}
+      <div ref={containerRef} className="relative z-10 flex-grow w-full mt-2">
+
+        {/* SVG edges — render dim ones first, then related on top */}
+        <svg className="absolute inset-0 w-full h-full" style={{ overflow:"visible" }}>
+          <defs>
+            <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="rgba(99,102,241,0.45)" />
+            </marker>
+            <marker id="arr-live" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L6,3 z" fill="rgba(255,255,255,0.6)" />
+            </marker>
+          </defs>
+
+          {/* dim pass */}
+          {EDGES.map(e => {
+            if (relatedEdge(e)) return null;
+            const f = pos[e.from], t = pos[e.to];
+            if (!f || !t) return null;
+            const live = liveEdge(e);
+            const fromNode = NODES.find(n => n.id === e.from)!;
+            const dx = t.cx-f.cx, dy = t.cy-f.cy;
+            const len = Math.sqrt(dx*dx+dy*dy) || 1;
+            const ux = dx/len, uy = dy/len;
+            const x1 = f.cx + ux*NODE_R, y1 = f.cy + uy*NODE_R;
+            const x2 = t.cx - ux*NODE_R, y2 = t.cy - uy*NODE_R;
+            const mx = (x1+x2)/2, my = (y1+y2)/2;
+            const perpX = -uy * 10, perpY = ux * 10;
+            return (
+              <g key={e.id}>
+                <line x1={x1} y1={y1} x2={x2} y2={y2}
+                  stroke="rgba(99,102,241,0.07)" strokeWidth={1.5} markerEnd="url(#arr)" />
+                <motion.line x1={x1} y1={y1} x2={x2} y2={y2}
+                  stroke={live ? fromNode.color : "rgba(99,102,241,0.14)"}
+                  strokeWidth={live ? 2 : 1} strokeDasharray="7 13"
+                  animate={{ strokeDashoffset:[0,-40] }}
+                  transition={{ duration:1.5, repeat:Infinity, ease:"linear" }}
+                  style={{ filter: live ? `drop-shadow(0 0 3px ${fromNode.color})` : "none" }} />
+                {live && <TravelDot x1={x1} y1={y1} x2={x2} y2={y2} color={fromNode.color} />}
+                {e.label && (
+                  <text x={mx+perpX} y={my+perpY-4} textAnchor="middle"
+                    fontSize="9" fontFamily="JetBrains Mono,monospace" fontWeight="700"
+                    fill={live ? (e.lc ?? "#818cf8") : "rgba(255,255,255,0.1)"}
+                    style={{ filter: live ? `drop-shadow(0 0 4px ${e.lc})` : "none" }}>
+                    {e.label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* highlighted pass — related edges rendered on top */}
+          {hovered !== null && EDGES.map(e => {
+            if (!relatedEdge(e)) return null;
+            const f = pos[e.from], t = pos[e.to];
+            if (!f || !t) return null;
+            const fromNode = NODES.find(n => n.id === e.from)!;
+            const dx = t.cx-f.cx, dy = t.cy-f.cy;
+            const len = Math.sqrt(dx*dx+dy*dy) || 1;
+            const ux = dx/len, uy = dy/len;
+            const x1 = f.cx + ux*NODE_R, y1 = f.cy + uy*NODE_R;
+            const x2 = t.cx - ux*NODE_R, y2 = t.cy - uy*NODE_R;
+            const mx = (x1+x2)/2, my = (y1+y2)/2;
+            const perpX = -uy * 10, perpY = ux * 10;
+            return (
+              <g key={`hl-${e.id}`}>
+                <motion.line x1={x1} y1={y1} x2={x2} y2={y2}
+                  stroke={fromNode.color} strokeWidth={3} strokeDasharray="7 13"
+                  animate={{ strokeDashoffset:[0,-40] }}
+                  transition={{ duration:1.2, repeat:Infinity, ease:"linear" }}
+                  markerEnd="url(#arr-live)"
+                  style={{ filter: `drop-shadow(0 0 7px ${fromNode.color})` }} />
+                <TravelDot x1={x1} y1={y1} x2={x2} y2={y2} color={fromNode.color} />
+                {e.label && (
+                  <text x={mx+perpX} y={my+perpY-4} textAnchor="middle"
+                    fontSize="11" fontFamily="JetBrains Mono,monospace" fontWeight="800"
+                    fill={e.lc ?? "#818cf8"}
+                    style={{ filter: `drop-shadow(0 0 6px ${e.lc})` }}>
+                    {e.label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Nodes */}
+        {NODES.map(n => {
+          const { cx, cy } = pos[n.id];
+          const isAct = active  === n.id;
+          const isHov = hovered === n.id;
+          const Icon  = n.icon;
+          const isUnit = n.id >= unitId(0) && n.id <= unitId(N-1);
+          const isAI   = n.id === AI_ID;
+          const showExpanded = (isAct || isHov) && (isUnit || isAI);
+          const subItems = isUnit ? UNIT_INPUTS : isAI ? AI_ITEMS : [];
+
+          return (
+            <motion.div key={n.id}
+              className="absolute flex flex-col items-center cursor-pointer"
+              style={{ left: cx, top: cy, transform:"translate(-50%,-50%)", zIndex: isHov ? 30 : 20 }}
+              animate={{ scale: isAct ? 1.1 : 1 }}
+              transition={{ duration:0.3 }}
+              onClick={() => { setActive(n.id); setAutoRun(false); }}
+              onMouseEnter={() => setHovered(n.id)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              {/* pulse halo */}
+              <AnimatePresence>
+                {isAct && (
+                  <motion.div className="absolute rounded-full pointer-events-none"
+                    style={{ width:NODE_R*2+22, height:NODE_R*2+22, top:"50%", left:"50%",
+                      transform:"translate(-50%,-50%)",
+                      background:`radial-gradient(circle, ${n.glow} 0%, transparent 70%)` }}
+                    initial={{ opacity:0, scale:0.7 }}
+                    animate={{ opacity:[0.7,0.15,0.7], scale:[1,1.3,1] }}
+                    exit={{ opacity:0 }}
+                    transition={{ duration:1.8, repeat:Infinity }} />
+                )}
+              </AnimatePresence>
+
+              {/* circle */}
+              <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+                style={{ width:NODE_R*2, height:NODE_R*2 }}
+                animate={{
+                  borderColor: isAct ? n.color : isHov ? n.color+"90" : "rgba(255,255,255,0.07)",
+                  background: isAct
+                    ? `radial-gradient(circle at 38% 38%, ${n.color}28, #090910)`
+                    : isHov ? `${n.color}15` : "#090910",
+                  boxShadow: isAct ? `0 0 20px ${n.glow}` : isHov ? `0 0 14px ${n.glow}` : "none",
+                }}
+                transition={{ duration:0.3 }}>
+                {isAct && (
+                  <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+                    style={{ background:`linear-gradient(90deg,transparent,${n.color},transparent)` }}
+                    initial={{ top:"10%" }} animate={{ top:"90%" }}
+                    transition={{ duration:1.4, repeat:Infinity, ease:"easeInOut" }} />
+                )}
+                <Icon className="w-5 h-5 mb-0.5" style={{ color: isAct || isHov ? n.color : "#374151" }} />
+                <span className="text-[8px] font-mono font-bold text-center px-1 leading-tight"
+                  style={{ color: isAct || isHov ? n.color : "#4b5563" }}>{n.tag}</span>
+              </motion.div>
+
+              {/* label */}
+              <motion.span className="mt-1.5 text-[11px] md:text-[12px] font-display font-semibold text-center leading-tight whitespace-pre-line"
+                style={{ maxWidth:80 }}
+                animate={{ color: isAct || isHov ? "#fff" : "#6b7280" }}
+                transition={{ duration:0.3 }}>
+                {n.label}
+              </motion.span>
+
+              {/* expanded popup — right side */}
+              <AnimatePresence>
+                {showExpanded && subItems.length > 0 && (
+                  <motion.div
+                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 rounded-xl border px-2.5 py-2 flex flex-col gap-1 pointer-events-none z-50"
+                    style={{ borderColor: n.color+"45", background:"#0b0b12",
+                      boxShadow:`0 0 18px ${n.glow}`, minWidth:152 }}
+                    initial={{ opacity:0, x:-8, scale:0.93 }}
+                    animate={{ opacity:1, x:0, scale:1 }}
+                    exit={{ opacity:0, x:-6, scale:0.93 }}
+                    transition={{ duration:0.2 }}>
+                    <span className="text-[8px] font-mono font-bold tracking-widest mb-0.5"
+                      style={{ color: n.color }}>
+                      {isUnit ? "INPUTS" : "PIPELINE"}
+                    </span>
+                    {subItems.map((item, ri) => {
+                      const ItemIcon = item.icon;
+                      return (
+                        <motion.div key={ri} className="flex items-center gap-1.5"
+                          initial={{ opacity:0, x:6 }} animate={{ opacity:1, x:0 }}
+                          transition={{ delay: ri*0.06 }}>
+                          <ItemIcon className="w-2.5 h-2.5 shrink-0" style={{ color: item.color }} />
+                          <span className="text-[9px] font-mono" style={{ color: item.color }}>{item.label}</span>
+                          <motion.div className="ml-auto w-1 h-1 rounded-full shrink-0"
+                            style={{ background: item.color }}
+                            animate={{ scale:[1,1.8,1], opacity:[1,0.3,1] }}
+                            transition={{ duration:1.6, repeat:Infinity, delay: ri*0.3 }} />
+                        </motion.div>
+                      );
+                    })}
+                    <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0"
+                      style={{ borderTop:"5px solid transparent", borderBottom:"5px solid transparent",
+                        borderRight:`5px solid ${n.color}45` }} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* tooltip — above */}
+              <AnimatePresence>
+                {isHov && !isUnit && !isAI && (n as any).tooltip && (
+                  <motion.div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 px-2.5 py-1.5 rounded-lg border text-[9px] font-mono font-semibold whitespace-nowrap pointer-events-none z-50"
+                    style={{ borderColor: n.color+"55", background:"#0d0d14", color:n.color, boxShadow:`0 0 12px ${n.glow}` }}
+                    initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }}
+                    exit={{ opacity:0 }} transition={{ duration:0.18 }}>
+                    {(n as any).tooltip}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                      style={{ borderLeft:"4px solid transparent", borderRight:"4px solid transparent",
+                        borderTop:`4px solid ${n.color}55` }} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+
+        {/* …N hint */}
+        {(() => {
+          const last = pos[unitId(N-1)];
+          if (!last) return null;
+          return (
+            <motion.div className="absolute pointer-events-none font-mono text-[10px] font-bold"
+              style={{ left: last.cx, top: last.cy + NODE_R + 14, transform:"translateX(-50%)", color:"#38bdf8" }}
+              animate={{ opacity:[0.2,0.6,0.2] }} transition={{ duration:2.4, repeat:Infinity }}>
+              · · · N
+            </motion.div>
+          );
+        })()}
+      </div>
+
+      {/* Footer */}
+      <div className="relative z-10 flex items-center justify-between border-t border-white/[0.04] pt-2">
+        <div className="flex items-center gap-2">
+          <motion.div className="w-1.5 h-1.5 rounded-full"
+            style={{ background: autoRun ? "#34d399" : "#6b7280" }}
+            animate={autoRun ? { scale:[1,1.7,1], opacity:[1,0.3,1] } : {}}
+            transition={{ duration:1.1, repeat:Infinity }} />
+          <span className="text-[9px] font-mono tracking-widest text-gray-500 uppercase">
+            {autoRun ? "Auto-walking nodes" : `Node ${active+1} / ${NODES.length} — click or hover any node`}
+          </span>
+        </div>
+        <p className="text-[10px] font-display font-light text-gray-500">
+          "From intent to <span className="text-white font-medium">governed delivery</span>."
+        </p>
+      </div>
+    </div>
+  );
+}
