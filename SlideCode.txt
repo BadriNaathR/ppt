@@ -1,123 +1,103 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  Upload, Scissors, Box, BrainCircuit,
-  GitMerge, FileCode, Code2, FileType, Database, FlaskConical,
-  ShieldCheck, PackageCheck
-} from "lucide-react";
+import { Upload, Cpu, Layers, Wrench, ChevronRight, FileCode, Code2, BrainCircuit, FlaskConical, CheckCircle2, BookOpen, Database, GitBranch, ShieldCheck, Rocket } from "lucide-react";
 import { SlideProps } from "../types";
 
-const N = 4;
-const NODE_R = 30;
+/* ─── config ─────────────────────────────────────────────── */
+const N_FU = 4; // functional units
+const N_TU = 3; // technical units per FU
 
-const C = {
-  intake:  { color: "#06b6d4", glow: "rgba(6,182,212,0.45)"   },
-  split:   { color: "#818cf8", glow: "rgba(129,140,248,0.45)" },
-  unit:    { color: "#38bdf8", glow: "rgba(56,189,248,0.4)"   },
-  ai:      { color: "#f59e0b", glow: "rgba(245,158,11,0.45)"  },
-  merge:   { color: "#34d399", glow: "rgba(52,211,153,0.5)"   },
-  qa:      { color: "#f472b6", glow: "rgba(244,114,182,0.45)" },
-  product: { color: "#a78bfa", glow: "rgba(167,139,250,0.5)"  },
-};
+const FU_COLORS = ["#06b6d4", "#818cf8", "#f59e0b", "#34d399"];
+const FU_GLOWS  = ["rgba(6,182,212,0.5)", "rgba(129,140,248,0.5)", "rgba(245,158,11,0.5)", "rgba(52,211,153,0.5)"];
 
-/* ── node ids ──
-   0        = Intake
-   1        = Splitting Agent
-   2…N+1    = Work Units
-   N+2      = Coding AI Assistant (single)
-   N+3      = Code Repository
-   N+4      = QA AI Engine
-   N+5      = Product
-── */
-const INTAKE_ID  = 0;
-const SPLIT_ID   = 1;
-const unitId     = (i: number) => 2 + i;
-const AI_ID      = 2 + N;
-const MERGE_ID   = 2 + N + 1;
-const QA_ID      = 2 + N + 2;
-const PRODUCT_ID = 2 + N + 3;
+const TU_LABELS = [
+  ["API Layer", "Data Model", "UI Component"],
+  ["Auth Module", "Session Mgr", "Role Engine"],
+  ["Event Bus", "Queue Svc", "Notifier"],
+  ["DB Schema", "Migration", "Seed Script"],
+];
 
+const FU_LABELS = ["Functional\nUnit 1", "Functional\nUnit 2", "Functional\nUnit 3", "Functional\nUnit 4"];
+const FU_DESCS  = [
+  "User authentication & access control flow",
+  "Payment processing & ledger management",
+  "Notification & event-driven messaging",
+  "Data persistence & schema management",
+];
+
+/* ─── node ids ───────────────────────────────────────────── */
+const INTAKE_ID = 0;
+const SPLIT_ID  = 1;
+const fuId      = (i: number) => 2 + i;
+const tuId      = (fi: number, ti: number) => 2 + N_FU + fi * N_TU + ti;
+
+/* ─── positions (%) ──────────────────────────────────────── */
 const X_INTAKE  = 4;
-const X_SPLIT   = 15;
-const X_UNIT    = 33;
-const X_AI      = 58;
-const X_MERGE   = 71;
-const X_QA      = 83;
-const X_PRODUCT = 94;
+const X_SPLIT   = 8;
+const X_FU      = 22;
+const X_TU      = 34;
+const X_SPEC    = 45;
+const X_DSL     = 56;
+const X_AI      = 68;
+const X_REPO    = 79;
+const X_QA      = 88;
+const X_PRODUCT = 96;
 
-const rowY = (i: number): number => {
+const fuY = (i: number): number => {
   if (i === 0) return 10;
-  if (i === 1) return 30;
-  if (i === 2) return 58;
-  return 82;
+  if (i === 1) return 32;
+  if (i === 2) return 50;
+  return 68;
 };
 
-type NodeDef = {
-  id: number; icon: React.ElementType; label: string; tag: string;
-  color: string; glow: string; xPct: number; yPct: number; tooltip?: string;
+const tuY = (fi: number, ti: number): number => {
+  const base = fuY(fi);
+  const offsets = [-7, 0, 7];
+  return base + offsets[ti];
 };
 
-const NODES: NodeDef[] = [
-  { id: INTAKE_ID, icon: Upload,       label: "User Story\n+ Design Intake", tag: "INPUT",
-    ...C.intake, xPct: X_INTAKE - 1, yPct: 38, tooltip: "Upload User Story & Design" },
-  { id: SPLIT_ID,  icon: Scissors,     label: "Splitting\nAgent",            tag: "SPLIT",
-    ...C.split,  xPct: X_SPLIT,      yPct: 75, tooltip: "Logically splits into independent units" },
-  ...Array.from({ length: N }, (_, i) => ({
-    id: unitId(i), icon: Box, label: `Unit ${i + 1}`, tag: `WU-${String(i+1).padStart(2,"0")}`,
-    ...C.unit, xPct: X_UNIT, yPct: rowY(i),
-  })),
-  { id: AI_ID,      icon: BrainCircuit, label: "Coding AI\nAssistant",       tag: "AI+TEST",
-    ...C.ai,     xPct: X_AI,           yPct: 50, tooltip: "Generates code + runs automated tests" },
-  { id: MERGE_ID,   icon: GitMerge,     label: "Code\nRepository",           tag: "REPO",
-    ...C.merge,  xPct: X_MERGE,        yPct: 50 },
-  { id: QA_ID,      icon: ShieldCheck,  label: "QA AI\nEngine",              tag: "QA",
-    ...C.qa,     xPct: X_QA,           yPct: 50, tooltip: "Automated quality assurance & regression" },
-  { id: PRODUCT_ID, icon: PackageCheck, label: "Product",                    tag: "LIVE",
-    ...C.product, xPct: X_PRODUCT,     yPct: 50 },
-];
+const NODE_R = 32;
 
-type EdgeDef = { id: string; from: number; to: number; label?: string; lc?: string };
+type Pos = { cx: number; cy: number };
 
-const EDGES: EdgeDef[] = [
-  { id: "e_in_sp",  from: INTAKE_ID, to: SPLIT_ID, label: "User Story",  lc: C.intake.color },
-  { id: "e_in_ai",  from: INTAKE_ID, to: AI_ID,    label: "Design Docs", lc: C.intake.color },
-  ...Array.from({ length: N }, (_, i) => ({
-    id: `e_sp_u${i}`, from: SPLIT_ID, to: unitId(i), label: "Spec .md", lc: C.split.color,
-  })),
-  ...Array.from({ length: N }, (_, i) => ({
-    id: `e_u_ai${i}`, from: unitId(i), to: AI_ID, label: "Bundle", lc: C.unit.color,
-  })),
-  { id: "e_ai_repo", from: AI_ID,    to: MERGE_ID,   label: "Tested",    lc: C.ai.color    },
-  { id: "e_repo_qa", from: MERGE_ID, to: QA_ID,      label: "Code",      lc: C.merge.color },
-  { id: "e_qa_prod", from: QA_ID,    to: PRODUCT_ID, label: "Approved",  lc: C.qa.color    },
-];
-
-const UNIT_INPUTS = [
-  { icon: FileCode,  label: "Spec .md",        color: "#818cf8" },
-  { icon: Code2,     label: "DSL YAML",         color: "#38bdf8" },
-  { icon: FileType,  label: "Design Docs",      color: "#06b6d4" },
-  { icon: Database,  label: "Knowledge Fabric", color: "#a78bfa" },
-];
-
-const AI_ITEMS = [
-  { icon: BrainCircuit, label: "Code Gen",     color: "#f59e0b" },
-  { icon: FlaskConical, label: "Auto Testing", color: "#34d399" },
-];
-
-function TravelDot({ x1, y1, x2, y2, color }: { x1:number; y1:number; x2:number; y2:number; color:string }) {
+function TravelDot({ x1, y1, x2, y2, color, dur = "1.8s" }: {
+  x1: number; y1: number; x2: number; y2: number; color: string; dur?: string;
+}) {
   return (
-    <circle r={2.8} fill={color} style={{ filter: `drop-shadow(0 0 4px ${color})` }}>
-      <animateMotion dur="1.6s" repeatCount="indefinite" path={`M${x1} ${y1} L${x2} ${y2}`} />
+    <circle r={3} fill={color} style={{ filter: `drop-shadow(0 0 5px ${color})` }}>
+      <animateMotion dur={dur} repeatCount="indefinite" path={`M${x1} ${y1} L${x2} ${y2}`} />
     </circle>
   );
 }
 
+function EdgeLine({ x1, y1, x2, y2, color, live, thick = false }: {
+  x1: number; y1: number; x2: number; y2: number;
+  color: string; live: boolean; thick?: boolean;
+}) {
+  return (
+    <g>
+      <line x1={x1} y1={y1} x2={x2} y2={y2}
+        stroke="rgba(255,255,255,0.04)" strokeWidth={1.5} markerEnd="url(#arr)" />
+      <motion.line x1={x1} y1={y1} x2={x2} y2={y2}
+        stroke={live ? color : "rgba(255,255,255,0.08)"}
+        strokeWidth={live ? (thick ? 3 : 2) : 1}
+        strokeDasharray="8 14"
+        animate={{ strokeDashoffset: [0, -44] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+        style={{ filter: live ? `drop-shadow(0 0 ${thick ? 8 : 4}px ${color})` : "none" }} />
+      {live && <TravelDot x1={x1} y1={y1} x2={x2} y2={y2} color={color} dur={thick ? "1.2s" : "1.8s"} />}
+    </g>
+  );
+}
+
 export default function SlideCodeDevelopment({ isActive }: SlideProps) {
-  const [active, setActive]   = useState(0);
-  const [autoRun, setAutoRun] = useState(true);
-  const [hovered, setHovered] = useState<number | null>(null);
+  const [hoveredFU, setHoveredFU] = useState<number | null>(null);
+  const [hoveredAI, setHoveredAI] = useState(false);
+  const [activeFU, setActiveFU]   = useState(1);
+  const [autoRun, setAutoRun]     = useState(false);
+  const [aiPhase, setAiPhase]     = useState<"idle" | "generating" | "testing" | "done">("generating");
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dim, setDim] = useState({ w: 900, h: 420 });
+  const [dim, setDim] = useState({ w: 900, h: 480 });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -129,256 +109,437 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
   }, []);
 
   useEffect(() => {
-    if (!isActive || !autoRun) return;
-    const t = setInterval(() => setActive(p => (p + 1) % NODES.length), 2000);
-    return () => clearInterval(t);
   }, [isActive, autoRun]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    setAiPhase("generating");
+    const t1 = setTimeout(() => setAiPhase("testing"),    1400);
+    const t2 = setTimeout(() => setAiPhase("done"),       2600);
+    const t3 = setTimeout(() => setAiPhase("generating"), 3600);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [isActive, activeFU]);
 
   if (!isActive) return null;
 
   const cpx = (p: number) => (p / 100) * dim.w;
   const cpy = (p: number) => (p / 100) * dim.h;
 
-  const pos: Record<number, { cx: number; cy: number }> = {};
-  NODES.forEach(n => { pos[n.id] = { cx: cpx(n.xPct), cy: cpy(n.yPct) }; });
+  const focusFU = hoveredFU ?? activeFU;  // default FU-2 (index 1), highlights on hover
 
-  const liveEdge    = (e: EdgeDef) => e.from === active  || e.to === active;
-  const relatedEdge = (e: EdgeDef) => e.from === hovered || e.to === hovered;
-  const activeNode  = NODES.find(n => n.id === active)!;
+  /* positions */
+  const intakeVisualPos: Pos = { cx: cpx(5),  cy: cpy(30) };
+  const intakePos: Pos = intakeVisualPos;
+  const splitPos:  Pos = { cx: cpx(14), cy: cpy(42) };
+  const fuPos  = (i: number): Pos => ({ cx: cpx(26), cy: cpy([6, 28, 49, 70][i]) });
+  const tuPos   = (fi: number, ti: number): Pos => ({ cx: cpx(38), cy: cpy([6,28,49,70][fi] + [-9,0,9][ti]) });
+  const specPos  = (fi: number, ti: number): Pos => ({ cx: cpx(49), cy: cpy([6,28,49,70][fi] + [-9,0,9][ti]) });
+  const dslPos   = (fi: number, ti: number): Pos => ({ cx: cpx(59), cy: cpy([6,28,49,70][fi] + [-9,0,9][ti]) });
+  const aiPos: Pos      = { cx: cpx(70), cy: cpy(37) };
+  const designPos: Pos  = { cx: cpx(70), cy: cpy(5) };
+  const designVisualPos: Pos = { cx: cpx(70), cy: cpy(5) };
+  const fabricPos: Pos  = { cx: cpx(70), cy: cpy(77) };
+  const fabricVisualPos: Pos = { cx: cpx(70), cy: cpy(77) };
+  const repoPos: Pos    = { cx: cpx(80), cy: cpy(37) };
+  const qaPos: Pos      = { cx: cpx(88), cy: cpy(37) };
+  const productPos: Pos = { cx: cpx(96), cy: cpy(37) };
+
+  /* shorten edge between two positions */
+  const shortenEdge = (from: Pos, to: Pos, rFrom = NODE_R, rTo = NODE_R) => {
+    const dx = to.cx - from.cx, dy = to.cy - from.cy;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    return {
+      x1: from.cx + ux * rFrom, y1: from.cy + uy * rFrom,
+      x2: to.cx   - ux * rTo,   y2: to.cy   - uy * rTo,
+      mx: (from.cx + to.cx) / 2, my: (from.cy + to.cy) / 2,
+      perpX: -uy * 8, perpY: ux * 8,
+    };
+  };
 
   return (
-    <div className="relative w-full h-full flex flex-col justify-between p-5 md:p-8 select-none bg-gradient-to-b from-[#030303] via-[#07070b] to-[#030303] overflow-hidden">
+    <div className="relative w-full h-full flex flex-col justify-between px-5 pt-4 pb-2 md:px-8 md:pt-5 md:pb-2 select-none bg-gradient-to-b from-[#030303] via-[#07070b] to-[#030303] overflow-hidden">
 
-      {/* Ambient glow */}
+      {/* Ambient glow follows focused FU */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <motion.div className="absolute rounded-full blur-[130px]"
+        <motion.div className="absolute rounded-full blur-[140px]"
           animate={{
-            left: `${pos[active]?.cx ?? cpx(50)}px`,
-            top:  `${pos[active]?.cy ?? cpy(50)}px`,
-            background: `radial-gradient(circle, ${activeNode.glow} 0%, transparent 65%)`,
+            left: `${fuPos(focusFU).cx}px`,
+            top:  `${fuPos(focusFU).cy}px`,
+            background: `radial-gradient(circle, ${FU_GLOWS[focusFU]} 0%, transparent 65%)`,
           }}
           transition={{ duration: 0.8, ease: "easeInOut" }}
-          style={{ width: 440, height: 440, transform: "translate(-50%,-50%)" }} />
+          style={{ width: 500, height: 500, transform: "translate(-50%,-50%)" }} />
         <div className="grid-bg absolute inset-0 opacity-[0.12]" />
       </div>
 
       {/* Header */}
       <div className="relative z-10 space-y-0.5">
-        <motion.div initial={{ opacity:0, y:-10 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.6 }}
-          className="flex items-center space-x-2">
-          <span className="h-px w-7 bg-gradient-to-r from-indigo-500 to-transparent" />
-          <span className="text-[10px] font-mono tracking-[0.3em] font-semibold text-indigo-400 uppercase">
-            Phase 04 — Governed AI Workflow
-          </span>
-        </motion.div>
-        <motion.h1 initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.6, delay:0.08 }}
-          className="text-2xl md:text-3xl font-display font-light tracking-tight text-white">
-          AI-SDLC{" "}
-          <span className="font-semibold bg-gradient-to-r from-white via-indigo-100 to-indigo-400 bg-clip-text text-transparent">
-            Node Workflow
+        <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.08 }}
+          className="text-2xl md:text-3xl lg:text-4xl font-display font-extralight tracking-tight text-white">
+          Spec-Driven{" "}
+          <span className="font-bold bg-gradient-to-r from-indigo-300 via-cyan-200 to-indigo-400 bg-clip-text text-transparent drop-shadow-[0_0_18px_rgba(99,102,241,0.5)]">
+            SDLC Framework
           </span>
         </motion.h1>
       </div>
 
       {/* Graph canvas */}
-      <div ref={containerRef} className="relative z-10 flex-grow w-full mt-2">
+      <div ref={containerRef} className="relative z-10 flex-grow w-full mt-1">
 
-        {/* SVG edges — render dim ones first, then related on top */}
-        <svg className="absolute inset-0 w-full h-full" style={{ overflow:"visible" }}>
+        <svg className="absolute inset-0 w-full h-full" style={{ overflow: "visible" }}>
           <defs>
             <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L6,3 z" fill="rgba(99,102,241,0.45)" />
-            </marker>
-            <marker id="arr-live" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L6,3 z" fill="rgba(255,255,255,0.6)" />
+              <path d="M0,0 L0,6 L6,3 z" fill="rgba(99,102,241,0.5)" />
             </marker>
           </defs>
 
-          {/* dim pass */}
-          {EDGES.map(e => {
-            if (relatedEdge(e)) return null;
-            const f = pos[e.from], t = pos[e.to];
-            if (!f || !t) return null;
-            const live = liveEdge(e);
-            const fromNode = NODES.find(n => n.id === e.from)!;
-            const dx = t.cx-f.cx, dy = t.cy-f.cy;
-            const len = Math.sqrt(dx*dx+dy*dy) || 1;
-            const ux = dx/len, uy = dy/len;
-            const x1 = f.cx + ux*NODE_R, y1 = f.cy + uy*NODE_R;
-            const x2 = t.cx - ux*NODE_R, y2 = t.cy - uy*NODE_R;
-            const mx = (x1+x2)/2, my = (y1+y2)/2;
-            const perpX = -uy * 10, perpY = ux * 10;
+          {/* User Story → AI Logical Splitting — straight arrow */}
+          {(() => {
+            const e = shortenEdge(intakeVisualPos, splitPos, NODE_R, NODE_R);
             return (
-              <g key={e.id}>
-                <line x1={x1} y1={y1} x2={x2} y2={y2}
-                  stroke="rgba(99,102,241,0.07)" strokeWidth={1.5} markerEnd="url(#arr)" />
-                <motion.line x1={x1} y1={y1} x2={x2} y2={y2}
-                  stroke={live ? fromNode.color : "rgba(99,102,241,0.14)"}
-                  strokeWidth={live ? 2 : 1} strokeDasharray="7 13"
-                  animate={{ strokeDashoffset:[0,-40] }}
-                  transition={{ duration:1.5, repeat:Infinity, ease:"linear" }}
-                  style={{ filter: live ? `drop-shadow(0 0 3px ${fromNode.color})` : "none" }} />
-                {live && <TravelDot x1={x1} y1={y1} x2={x2} y2={y2} color={fromNode.color} />}
-                {e.label && (
-                  <text x={mx+perpX} y={my+perpY-4} textAnchor="middle"
+              <g>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#06b6d4" live={true} thick={true} />
+              </g>
+            );
+          })()}
+
+          {/* Intake → Design Docs curved arrow */}
+          {(() => {
+            const startX = intakeVisualPos.cx + NODE_R;
+            const startY = intakeVisualPos.cy;
+            const endX = designVisualPos.cx - 22;
+            const endY = designVisualPos.cy;
+            const midX = (startX + endX) / 2;
+            const midY = Math.min(startY, endY) - 60; // control point higher above for bigger curve
+            const path = `M${startX},${startY} Q${midX},${midY} ${endX},${endY}`;
+            return (
+              <g>
+                <motion.path
+                  d={path}
+                  fill="none"
+                  stroke="#38bdf8"
+                  strokeWidth={3}
+                  markerEnd="url(#arr)"
+                  style={{ filter: `drop-shadow(0 0 6px #38bdf8)` }}
+                  animate={{ strokeDashoffset: [0, -44] }}
+                  strokeDasharray="8 14"
+                  transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+                />
+              </g>
+            );
+          })()}
+
+          {/* Split → each FU */}
+          {Array.from({ length: N_FU }, (_, i) => {
+            const e = shortenEdge(splitPos, fuPos(i));
+            const live = i === focusFU;
+            return (
+              <g key={`sp-fu${i}`}>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
+                  color={FU_COLORS[i]} live={live} thick={live} />
+                {live && (
+                  <text x={e.mx + e.perpX} y={e.my + e.perpY - 4} textAnchor="middle"
                     fontSize="9" fontFamily="JetBrains Mono,monospace" fontWeight="700"
-                    fill={live ? (e.lc ?? "#818cf8") : "rgba(255,255,255,0.1)"}
-                    style={{ filter: live ? `drop-shadow(0 0 4px ${e.lc})` : "none" }}>
-                    {e.label}
+                    fill={FU_COLORS[i]} style={{ filter: `drop-shadow(0 0 4px ${FU_COLORS[i]})` }}>
+                    Logical Split
                   </text>
                 )}
               </g>
             );
           })}
 
-          {/* highlighted pass — related edges rendered on top */}
-          {hovered !== null && EDGES.map(e => {
-            if (!relatedEdge(e)) return null;
-            const f = pos[e.from], t = pos[e.to];
-            if (!f || !t) return null;
-            const fromNode = NODES.find(n => n.id === e.from)!;
-            const dx = t.cx-f.cx, dy = t.cy-f.cy;
-            const len = Math.sqrt(dx*dx+dy*dy) || 1;
-            const ux = dx/len, uy = dy/len;
-            const x1 = f.cx + ux*NODE_R, y1 = f.cy + uy*NODE_R;
-            const x2 = t.cx - ux*NODE_R, y2 = t.cy - uy*NODE_R;
-            const mx = (x1+x2)/2, my = (y1+y2)/2;
-            const perpX = -uy * 10, perpY = ux * 10;
+          {/* FU → TUs (only for focused FU) */}
+          {Array.from({ length: N_TU }, (_, ti) => {
+            const e = shortenEdge(fuPos(focusFU), tuPos(focusFU, ti), NODE_R, NODE_R - 4);
             return (
-              <g key={`hl-${e.id}`}>
-                <motion.line x1={x1} y1={y1} x2={x2} y2={y2}
-                  stroke={fromNode.color} strokeWidth={3} strokeDasharray="7 13"
-                  animate={{ strokeDashoffset:[0,-40] }}
-                  transition={{ duration:1.2, repeat:Infinity, ease:"linear" }}
-                  markerEnd="url(#arr-live)"
-                  style={{ filter: `drop-shadow(0 0 7px ${fromNode.color})` }} />
-                <TravelDot x1={x1} y1={y1} x2={x2} y2={y2} color={fromNode.color} />
-                {e.label && (
-                  <text x={mx+perpX} y={my+perpY-4} textAnchor="middle"
-                    fontSize="11" fontFamily="JetBrains Mono,monospace" fontWeight="800"
-                    fill={e.lc ?? "#818cf8"}
-                    style={{ filter: `drop-shadow(0 0 6px ${e.lc})` }}>
-                    {e.label}
+              <g key={`fu-tu${ti}`}>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
+                  color={FU_COLORS[focusFU]} live={true} thick={false} />
+              </g>
+            );
+          })}
+
+          {/* TU → Spec .md */}
+          {Array.from({ length: N_TU }, (_, ti) => {
+            const e = shortenEdge(tuPos(focusFU, ti), specPos(focusFU, ti), NODE_R - 4, 22);
+            return (
+              <g key={`tu-spec${ti}`}>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
+                  color={FU_COLORS[focusFU]} live={true} />
+                <text x={e.mx + e.perpX} y={e.my + e.perpY - 4} textAnchor="middle"
+                  fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700"
+                  fill={FU_COLORS[focusFU] + "80"}>
+                  generates
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Spec .md → DSL YAML */}
+          {Array.from({ length: N_TU }, (_, ti) => {
+            const e = shortenEdge(specPos(focusFU, ti), dslPos(focusFU, ti), 22, 22);
+            return (
+              <g key={`spec-dsl${ti}`}>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
+                  color="#a78bfa" live={true} />
+                <text x={e.mx + e.perpX} y={e.my + e.perpY - 4} textAnchor="middle"
+                  fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700"
+                  fill="#a78bfa80">
+                  converts
+                </text>
+              </g>
+            );
+          })}
+
+          {/* DSL → Code AI (all 3 TU DSLs converge) */}
+          {Array.from({ length: N_TU }, (_, ti) => {
+            const aiColor = aiPhase === "done" ? "#34d399" : aiPhase === "testing" ? "#f59e0b" : "#e879f9";
+            const e = shortenEdge(dslPos(focusFU, ti), aiPos, 22, NODE_R + 4);
+            return (
+              <g key={`dsl-ai${ti}`}>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
+                  color={aiColor} live={true} thick={ti === 1} />
+                {ti === 1 && (
+                  <text x={e.mx + e.perpX} y={e.my + e.perpY - 5} textAnchor="middle"
+                    fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700"
+                    fill={aiColor + "99"}>
+                    all DSLs
                   </text>
                 )}
               </g>
             );
           })}
+
+          {/* Design Docs → Code AI */}
+          {(() => {
+            const e = shortenEdge(designPos, aiPos, 22, NODE_R + 4);
+            return (
+              <g>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#38bdf8" live={true} />
+                <text x={e.mx + 6} y={e.my - 5} textAnchor="middle"
+                  fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#38bdf880">
+                  design
+                </text>
+              </g>
+            );
+          })()}
+
+          {/* Knowledge Fabric → Code AI */}
+          {(() => {
+            const e = shortenEdge(fabricPos, aiPos, 22, NODE_R + 4);
+            return (
+              <g>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#fb923c" live={true} />
+                <text x={e.mx + 6} y={e.my + 12} textAnchor="middle"
+                  fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#fb923c80">
+                  knowledge
+                </text>
+              </g>
+            );
+          })()}
+
+          {/* Code AI → Code Repo */}
+          {(() => {
+            const e = shortenEdge(aiPos, repoPos, NODE_R + 4, NODE_R - 4);
+            return (
+              <g>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#34d399" live={aiPhase === "done"} thick={true} />
+                <text x={e.mx} y={e.my - 7} textAnchor="middle"
+                  fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#34d39980">
+                  commit
+                </text>
+              </g>
+            );
+          })()}
+
+          {/* Code Repo → QA AI Engine */}
+          {(() => {
+            const e = shortenEdge(repoPos, qaPos, NODE_R - 4, NODE_R - 4);
+            return (
+              <g>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#f472b6" live={true} thick={true} />
+                <text x={e.mx} y={e.my - 7} textAnchor="middle"
+                  fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#f472b680">
+                  scan
+                </text>
+              </g>
+            );
+          })()}
+
+          {/* QA AI Engine → Product */}
+          {(() => {
+            const e = shortenEdge(qaPos, productPos, NODE_R - 4, NODE_R - 6);
+            return (
+              <g>
+                <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#facc15" live={true} thick={true} />
+                <text x={e.mx} y={e.my - 7} textAnchor="middle"
+                  fontSize="8" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#facc1580">
+                  ship
+                </text>
+              </g>
+            );
+          })()}
         </svg>
 
-        {/* Nodes */}
-        {NODES.map(n => {
-          const { cx, cy } = pos[n.id];
-          const isAct = active  === n.id;
-          const isHov = hovered === n.id;
-          const Icon  = n.icon;
-          const isUnit = n.id >= unitId(0) && n.id <= unitId(N-1);
-          const isAI   = n.id === AI_ID;
-          const showExpanded = (isAct || isHov) && (isUnit || isAI);
-          const subItems = isUnit ? UNIT_INPUTS : isAI ? AI_ITEMS : [];
+        {/* ── Node: Intake ── */}
+        <motion.div className="absolute flex flex-col items-center cursor-pointer"
+          style={{ left: intakeVisualPos.cx, top: intakeVisualPos.cy, transform: "translate(-50%,-50%)", zIndex: 20 }}
+          initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1, y: [0, 10, 0] }}
+          transition={{ opacity: { duration: 0.5 }, scale: { duration: 0.5 }, y: { duration: 3, repeat: Infinity, ease: "easeInOut" } }}>
+          <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+            style={{ width: NODE_R * 2, height: NODE_R * 2 }}
+            animate={{ borderColor: "#06b6d4", background: "radial-gradient(circle at 38% 38%, #06b6d428, #090910)", boxShadow: "0 0 22px rgba(6,182,212,0.4)" }}>
+            <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{ background: "linear-gradient(90deg,transparent,#06b6d4,transparent)" }}
+              initial={{ top: "10%" }} animate={{ top: "90%" }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }} />
+            <Upload className="w-5 h-5 mb-0.5" style={{ color: "#06b6d4" }} />
+            <span className="text-[7px] font-mono font-bold" style={{ color: "#06b6d4" }}>INPUT</span>
+          </motion.div>
+          <span className="mt-1.5 text-[11px] font-display font-semibold text-center leading-tight whitespace-pre-line text-white" style={{ maxWidth: 80 }}>
+            {"User Story\n+ Design Doc"}
+          </span>
+        </motion.div>
+
+        {/* ── Node: AI Splitting ── */}
+        <motion.div className="absolute flex flex-col items-center cursor-pointer"
+          style={{ left: splitPos.cx, top: splitPos.cy, transform: "translate(-50%,-50%)", zIndex: 20 }}
+          initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.15 }}>
+          {/* outer ring pulse */}
+          <motion.div className="absolute rounded-full pointer-events-none"
+            style={{ width: NODE_R * 2 + 20, height: NODE_R * 2 + 20, top: "50%", left: "50%",
+              transform: "translate(-50%,-50%)", background: "radial-gradient(circle, rgba(129,140,248,0.35) 0%, transparent 70%)" }}
+            animate={{ scale: [1, 1.25, 1], opacity: [0.6, 0.1, 0.6] }}
+            transition={{ duration: 2, repeat: Infinity }} />
+          <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+            style={{ width: NODE_R * 2, height: NODE_R * 2 }}
+            animate={{ borderColor: "#818cf8", background: "radial-gradient(circle at 38% 38%, #818cf828, #090910)", boxShadow: "0 0 22px rgba(129,140,248,0.4)" }}>
+            <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{ background: "linear-gradient(90deg,transparent,#818cf8,transparent)" }}
+              initial={{ top: "10%" }} animate={{ top: "90%" }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }} />
+            <Cpu className="w-5 h-5 mb-0.5" style={{ color: "#818cf8" }} />
+            <span className="text-[7px] font-mono font-bold" style={{ color: "#818cf8" }}>AI SPLIT</span>
+          </motion.div>
+          <span className="mt-1.5 text-[11px] font-display font-semibold text-center leading-tight whitespace-pre-line text-white" style={{ maxWidth: 80, transform: "translate(-16px, -8px)" }}>
+            {"AI Logical\nSplitting"}
+          </span>
+        </motion.div>
+
+        {/* ── Functional Unit nodes ── */}
+        {Array.from({ length: N_FU }, (_, i) => {
+          const { cx, cy } = fuPos(i);
+          const isFocus = focusFU === i;
+          const isHov   = hoveredFU === i;
+          const color   = FU_COLORS[i];
+          const glow    = FU_GLOWS[i];
 
           return (
-            <motion.div key={n.id}
+            <motion.div key={`fu${i}`}
               className="absolute flex flex-col items-center cursor-pointer"
-              style={{ left: cx, top: cy, transform:"translate(-50%,-50%)", zIndex: isHov ? 30 : 20 }}
-              animate={{ scale: isAct ? 1.1 : 1 }}
-              transition={{ duration:0.3 }}
-              onClick={() => { setActive(n.id); setAutoRun(false); }}
-              onMouseEnter={() => setHovered(n.id)}
-              onMouseLeave={() => setHovered(null)}
+              style={{ left: cx, top: cy, transform: "translate(-50%,-50%)", zIndex: isHov ? 40 : 20 }}
+              animate={{ scale: isFocus ? 1.12 : 1 }}
+              transition={{ duration: 0.35 }}
+              onClick={() => { setActiveFU(i); setAutoRun(false); }}
+              onMouseEnter={() => setHoveredFU(i)}
+              onMouseLeave={() => setHoveredFU(null)}
             >
               {/* pulse halo */}
               <AnimatePresence>
-                {isAct && (
+                {isFocus && (
                   <motion.div className="absolute rounded-full pointer-events-none"
-                    style={{ width:NODE_R*2+22, height:NODE_R*2+22, top:"50%", left:"50%",
-                      transform:"translate(-50%,-50%)",
-                      background:`radial-gradient(circle, ${n.glow} 0%, transparent 70%)` }}
-                    initial={{ opacity:0, scale:0.7 }}
-                    animate={{ opacity:[0.7,0.15,0.7], scale:[1,1.3,1] }}
-                    exit={{ opacity:0 }}
-                    transition={{ duration:1.8, repeat:Infinity }} />
+                    style={{ width: NODE_R * 2 + 24, height: NODE_R * 2 + 24, top: "50%", left: "50%",
+                      transform: "translate(-50%,-50%)", background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }}
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: [0.7, 0.15, 0.7], scale: [1, 1.3, 1] }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.8, repeat: Infinity }} />
                 )}
               </AnimatePresence>
 
               {/* circle */}
               <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
-                style={{ width:NODE_R*2, height:NODE_R*2 }}
+                style={{ width: NODE_R * 2, height: NODE_R * 2 }}
                 animate={{
-                  borderColor: isAct ? n.color : isHov ? n.color+"90" : "rgba(255,255,255,0.07)",
-                  background: isAct
-                    ? `radial-gradient(circle at 38% 38%, ${n.color}28, #090910)`
-                    : isHov ? `${n.color}15` : "#090910",
-                  boxShadow: isAct ? `0 0 20px ${n.glow}` : isHov ? `0 0 14px ${n.glow}` : "none",
+                  borderColor: isFocus ? color : isHov ? color + "80" : "rgba(255,255,255,0.08)",
+                  background: isFocus ? `radial-gradient(circle at 38% 38%, ${color}28, #090910)` : isHov ? `${color}12` : "#090910",
+                  boxShadow: isFocus ? `0 0 22px ${glow}` : "none",
                 }}
-                transition={{ duration:0.3 }}>
-                {isAct && (
+                transition={{ duration: 0.3 }}>
+                {isFocus && (
                   <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
-                    style={{ background:`linear-gradient(90deg,transparent,${n.color},transparent)` }}
-                    initial={{ top:"10%" }} animate={{ top:"90%" }}
-                    transition={{ duration:1.4, repeat:Infinity, ease:"easeInOut" }} />
+                    style={{ background: `linear-gradient(90deg,transparent,${color},transparent)` }}
+                    initial={{ top: "10%" }} animate={{ top: "90%" }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }} />
                 )}
-                <Icon className="w-5 h-5 mb-0.5" style={{ color: isAct || isHov ? n.color : "#374151" }} />
-                <span className="text-[8px] font-mono font-bold text-center px-1 leading-tight"
-                  style={{ color: isAct || isHov ? n.color : "#4b5563" }}>{n.tag}</span>
+                <Layers className="w-5 h-5 mb-0.5" style={{ color: isFocus || isHov ? color : "#374151" }} />
+                <span className="text-[7px] font-mono font-bold text-center px-1"
+                  style={{ color: isFocus || isHov ? color : "#4b5563" }}>
+                  FU-{String(i + 1).padStart(2, "0")}
+                </span>
               </motion.div>
 
               {/* label */}
-              <motion.span className="mt-1.5 text-[11px] md:text-[12px] font-display font-semibold text-center leading-tight whitespace-pre-line"
-                style={{ maxWidth:80 }}
-                animate={{ color: isAct || isHov ? "#fff" : "#6b7280" }}
-                transition={{ duration:0.3 }}>
-                {n.label}
+              <motion.span className="mt-1.5 text-[11px] font-display font-semibold text-center leading-tight whitespace-pre-line"
+                style={{ maxWidth: 80 }}
+                animate={{ color: isFocus || isHov ? "#fff" : "#6b7280" }}
+                transition={{ duration: 0.3 }}>
+                {FU_LABELS[i]}
               </motion.span>
 
-              {/* expanded popup — right side */}
+              {/* hover popup — shows FU description + TU list */}
               <AnimatePresence>
-                {showExpanded && subItems.length > 0 && (
+                {isHov && (
                   <motion.div
-                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 rounded-xl border px-2.5 py-2 flex flex-col gap-1 pointer-events-none z-50"
-                    style={{ borderColor: n.color+"45", background:"#0b0b12",
-                      boxShadow:`0 0 18px ${n.glow}`, minWidth:152 }}
-                    initial={{ opacity:0, x:-8, scale:0.93 }}
-                    animate={{ opacity:1, x:0, scale:1 }}
-                    exit={{ opacity:0, x:-6, scale:0.93 }}
-                    transition={{ duration:0.2 }}>
-                    <span className="text-[8px] font-mono font-bold tracking-widest mb-0.5"
-                      style={{ color: n.color }}>
-                      {isUnit ? "INPUTS" : "PIPELINE"}
-                    </span>
-                    {subItems.map((item, ri) => {
-                      const ItemIcon = item.icon;
-                      return (
-                        <motion.div key={ri} className="flex items-center gap-1.5"
-                          initial={{ opacity:0, x:6 }} animate={{ opacity:1, x:0 }}
-                          transition={{ delay: ri*0.06 }}>
-                          <ItemIcon className="w-2.5 h-2.5 shrink-0" style={{ color: item.color }} />
-                          <span className="text-[9px] font-mono" style={{ color: item.color }}>{item.label}</span>
-                          <motion.div className="ml-auto w-1 h-1 rounded-full shrink-0"
-                            style={{ background: item.color }}
-                            animate={{ scale:[1,1.8,1], opacity:[1,0.3,1] }}
-                            transition={{ duration:1.6, repeat:Infinity, delay: ri*0.3 }} />
-                        </motion.div>
-                      );
-                    })}
-                    <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0"
-                      style={{ borderTop:"5px solid transparent", borderBottom:"5px solid transparent",
-                        borderRight:`5px solid ${n.color}45` }} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    className={`absolute ${i === 0 ? 'top-full mt-3' : 'bottom-full mb-3'} left-1/2 -translate-x-1/2 rounded-2xl border px-3 py-3 flex flex-col gap-2 pointer-events-none z-50`}
+                    style={{ borderColor: color + "50", background: "#0a0a12",
+                      boxShadow: `0 0 28px ${glow}, 0 0 0 1px ${color}20`, minWidth: 200 }}
+                    initial={{ opacity: 0, y: i === 0 ? -10 : 10, scale: 0.92 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: i === 0 ? -8 : 8, scale: 0.92 }}
+                    transition={{ duration: 0.22 }}
+                  >
+                    {/* header */}
+                    <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: color + "30" }}>
+                      <div className="w-2 h-2 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}` }} />
+                      <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color }}>
+                        FUNCTIONAL UNIT {i + 1}
+                      </span>
+                    </div>
 
-              {/* tooltip — above */}
-              <AnimatePresence>
-                {isHov && !isUnit && !isAI && (n as any).tooltip && (
-                  <motion.div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 px-2.5 py-1.5 rounded-lg border text-[9px] font-mono font-semibold whitespace-nowrap pointer-events-none z-50"
-                    style={{ borderColor: n.color+"55", background:"#0d0d14", color:n.color, boxShadow:`0 0 12px ${n.glow}` }}
-                    initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }}
-                    exit={{ opacity:0 }} transition={{ duration:0.18 }}>
-                    {(n as any).tooltip}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
-                      style={{ borderLeft:"4px solid transparent", borderRight:"4px solid transparent",
-                        borderTop:`4px solid ${n.color}55` }} />
+                    {/* description */}
+                    <p className="text-[9px] font-mono text-gray-400 leading-relaxed">{FU_DESCS[i]}</p>
+
+                    {/* technical units */}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[8px] font-mono font-bold tracking-widest text-gray-500 uppercase">
+                        Technical Units
+                      </span>
+                      {TU_LABELS[i].map((tu, ti) => (
+                        <motion.div key={ti} className="flex items-center gap-2"
+                          initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: ti * 0.07 }}>
+                          <ChevronRight className="w-2.5 h-2.5 shrink-0" style={{ color }} />
+                          <span className="text-[9px] font-mono" style={{ color: color + "dd" }}>{tu}</span>
+                          <motion.div className="ml-auto w-1 h-1 rounded-full shrink-0" style={{ background: color }}
+                            animate={{ scale: [1, 1.8, 1], opacity: [1, 0.3, 1] }}
+                            transition={{ duration: 1.6, repeat: Infinity, delay: ti * 0.3 }} />
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* caret — top for FU-1 (points up), bottom for others (points down) */}
+                    {i === 0 ? (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0"
+                        style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+                          borderBottom: `6px solid ${color}50` }} />
+                    ) : (
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                        style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+                          borderTop: `6px solid ${color}50` }} />
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -386,18 +547,399 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
           );
         })}
 
-        {/* …N hint */}
+        {/* ── Technical Unit nodes (only for focused FU) ── */}
+        <AnimatePresence mode="wait">
+          {Array.from({ length: N_TU }, (_, ti) => {
+            const { cx, cy } = tuPos(focusFU, ti);
+            const color = FU_COLORS[focusFU];
+            const glow  = FU_GLOWS[focusFU];
+            return (
+              <motion.div key={`tu-${focusFU}-${ti}`}
+                className="absolute flex flex-col items-center"
+                style={{ left: cx, top: cy, transform: "translate(-50%,-50%)", zIndex: 20 }}
+                initial={{ opacity: 0, scale: 0.5, x: -20 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.5, x: -20 }}
+                transition={{ duration: 0.4, delay: ti * 0.08 }}
+              >
+                {/* glow ring */}
+                <motion.div className="absolute rounded-full pointer-events-none"
+                  style={{ width: (NODE_R - 4) * 2 + 16, height: (NODE_R - 4) * 2 + 16,
+                    top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                    background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }}
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.1, 0.4] }}
+                  transition={{ duration: 2.2, repeat: Infinity, delay: ti * 0.4 }} />
+
+                <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+                  style={{ width: (NODE_R - 4) * 2, height: (NODE_R - 4) * 2 }}
+                  animate={{ borderColor: color + "90", background: `radial-gradient(circle at 38% 38%, ${color}20, #090910)`,
+                    boxShadow: `0 0 14px ${glow}` }}>
+                  <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+                    style={{ background: `linear-gradient(90deg,transparent,${color},transparent)` }}
+                    initial={{ top: "10%" }} animate={{ top: "90%" }}
+                    transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut", delay: ti * 0.3 }} />
+                  <Wrench className="w-3.5 h-3.5 mb-0.5" style={{ color }} />
+                  <span className="text-[7px] font-mono font-bold" style={{ color }}>
+                    TU-{String(ti + 1).padStart(2, "0")}
+                  </span>
+                </motion.div>
+
+                <motion.span className="mt-1 text-[9px] font-display font-semibold text-center leading-tight"
+                  style={{ maxWidth: 72, color: color + "cc" }}>
+                  {TU_LABELS[focusFU][ti]}
+                </motion.span>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+        {/* ── Spec .md nodes ── */}
+        <AnimatePresence>
+          {Array.from({ length: N_TU }, (_, ti) => {
+            const { cx, cy } = specPos(focusFU, ti);
+            const color = FU_COLORS[focusFU];
+            const glow  = FU_GLOWS[focusFU];
+            return (
+              <motion.div key={`spec-${focusFU}-${ti}`}
+                className="absolute flex flex-col items-center"
+                style={{ left: cx, top: cy, transform: "translate(-50%,-50%)", zIndex: 20 }}
+                initial={{ opacity: 0, scale: 0.5, x: -16 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.35, delay: ti * 0.1 }}
+              >
+                <motion.div className="relative flex flex-col items-center justify-center rounded-xl border-2 overflow-hidden"
+                  style={{ width: 44, height: 44 }}
+                  animate={{ borderColor: color + "80", background: `linear-gradient(135deg, ${color}18, #090910)`,
+                    boxShadow: `0 0 12px ${glow}` }}>
+                  <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+                    style={{ background: `linear-gradient(90deg,transparent,${color},transparent)` }}
+                    initial={{ top: "10%" }} animate={{ top: "90%" }}
+                    transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut", delay: ti * 0.25 }} />
+                  <FileCode className="w-4 h-4" style={{ color }} />
+                </motion.div>
+                <motion.span className="mt-1 text-[8px] font-mono font-bold text-center"
+                  style={{ color: color + "cc" }}>
+                  spec.md
+                </motion.span>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+        {/* ── DSL YAML nodes ── */}
+        <AnimatePresence>
+          {Array.from({ length: N_TU }, (_, ti) => {
+            const { cx, cy } = dslPos(focusFU, ti);
+            return (
+              <motion.div key={`dsl-${focusFU}-${ti}`}
+                className="absolute flex flex-col items-center"
+                style={{ left: cx, top: cy, transform: "translate(-50%,-50%)", zIndex: 20 }}
+                initial={{ opacity: 0, scale: 0.5, x: -16 }}
+                animate={{ opacity: 1, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.35, delay: ti * 0.1 + 0.15 }}
+              >
+                <motion.div className="relative flex flex-col items-center justify-center rounded-xl border-2 overflow-hidden"
+                  style={{ width: 44, height: 44 }}
+                  animate={{ borderColor: "#a78bfa80", background: "linear-gradient(135deg, #a78bfa18, #090910)",
+                    boxShadow: "0 0 12px rgba(167,139,250,0.35)" }}>
+                  <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+                    style={{ background: "linear-gradient(90deg,transparent,#a78bfa,transparent)" }}
+                    initial={{ top: "10%" }} animate={{ top: "90%" }}
+                    transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: ti * 0.25 }} />
+                  <Code2 className="w-4 h-4" style={{ color: "#a78bfa" }} />
+                </motion.div>
+                <motion.span className="mt-1 text-[8px] font-mono font-bold text-center"
+                  style={{ color: "#a78bfacc" }}>
+                  dsl.yaml
+                </motion.span>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+        {/* ── Design Docs input node ── */}
+        <motion.div className="absolute flex flex-col items-center"
+          style={{ left: designVisualPos.cx, top: designVisualPos.cy, transform: "translate(-50%,-50%)", zIndex: 25 }}
+          initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <motion.div className="absolute rounded-xl pointer-events-none"
+            style={{ width: 60, height: 60, top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+              background: "radial-gradient(circle, rgba(56,189,248,0.4) 0%, transparent 70%)" }}
+            animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0.1, 0.6] }}
+            transition={{ duration: 2.4, repeat: Infinity }} />
+          <motion.div className="relative flex flex-col items-center justify-center rounded-xl border-2 overflow-hidden"
+            style={{ width: 48, height: 48 }}
+            animate={{ borderColor: "#38bdf880", background: "linear-gradient(135deg, #38bdf818, #090910)",
+              boxShadow: "0 0 16px rgba(56,189,248,0.4)" }}>
+            <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{ background: "linear-gradient(90deg,transparent,#38bdf8,transparent)" }}
+              initial={{ top: "10%" }} animate={{ top: "90%" }}
+              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }} />
+            <BookOpen className="w-5 h-5" style={{ color: "#38bdf8" }} />
+          </motion.div>
+          <span className="mt-1 text-[11px] font-mono font-bold text-center leading-tight" style={{ color: "#38bdf8cc", maxWidth: 72 }}>
+            Design Docs
+          </span>
+        </motion.div>
+
+        {/* ── Knowledge Fabric input node ── */}
+        <motion.div className="absolute flex flex-col items-center"
+          style={{ left: fabricVisualPos.cx, top: fabricVisualPos.cy, transform: "translate(-50%,-50%)", zIndex: 25 }}
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <motion.div className="absolute rounded-xl pointer-events-none"
+            style={{ width: 60, height: 60, top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+              background: "radial-gradient(circle, rgba(251,146,60,0.4) 0%, transparent 70%)" }}
+            animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0.1, 0.6] }}
+            transition={{ duration: 2.8, repeat: Infinity, delay: 0.6 }} />
+          <motion.div className="relative flex flex-col items-center justify-center rounded-xl border-2 overflow-hidden"
+            style={{ width: 48, height: 48 }}
+            animate={{ borderColor: "#fb923c80", background: "linear-gradient(135deg, #fb923c18, #090910)",
+              boxShadow: "0 0 16px rgba(251,146,60,0.4)" }}>
+            <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{ background: "linear-gradient(90deg,transparent,#fb923c,transparent)" }}
+              initial={{ top: "10%" }} animate={{ top: "90%" }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }} />
+            <Database className="w-5 h-5" style={{ color: "#fb923c" }} />
+          </motion.div>
+          <span className="mt-1 text-[11px] font-mono font-bold text-center leading-tight" style={{ color: "#fb923ccc", maxWidth: 80 }}>
+            Enterprise &
+          </span>
+          <span className="text-[11px] font-mono font-bold text-center leading-tight" style={{ color: "#fb923ccc", maxWidth: 80 }}>
+            App Knowledge
+          </span>
+          <span className="text-[9px] font-mono text-center leading-tight" style={{ color: "#fb923c60", maxWidth: 80 }}>
+            Fabric
+          </span>
+        </motion.div>
+
+        {/* ── Code AI Assistant node ── */}
         {(() => {
-          const last = pos[unitId(N-1)];
-          if (!last) return null;
+          const { cx, cy } = aiPos;
+          const aiVisualCx = cx;
+          const aiVisualCy = cy;
+          const aiColor = aiPhase === "done" ? "#34d399" : aiPhase === "testing" ? "#f59e0b" : "#e879f9";
+          const aiGlow  = aiPhase === "done" ? "rgba(52,211,153,0.5)" : aiPhase === "testing" ? "rgba(245,158,11,0.5)" : "rgba(232,121,249,0.5)";
+          const AiIcon  = aiPhase === "testing" ? FlaskConical : aiPhase === "done" ? CheckCircle2 : BrainCircuit;
+          const aiLabel = aiPhase === "generating" ? "Generating…" : aiPhase === "testing" ? "Testing…" : "✓ Done";
           return (
-            <motion.div className="absolute pointer-events-none font-mono text-[10px] font-bold"
-              style={{ left: last.cx, top: last.cy + NODE_R + 14, transform:"translateX(-50%)", color:"#38bdf8" }}
-              animate={{ opacity:[0.2,0.6,0.2] }} transition={{ duration:2.4, repeat:Infinity }}>
-              · · · N
+            <motion.div className="absolute flex flex-col items-center"
+              style={{ left: aiVisualCx, top: aiVisualCy, transform: "translate(-50%,-50%)", zIndex: 30 }}
+              initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              onMouseEnter={() => setHoveredAI(true)}
+              onMouseLeave={() => setHoveredAI(false)}
+            >
+              {/* outer pulse ring */}
+              <motion.div className="absolute rounded-full pointer-events-none"
+                style={{ width: NODE_R * 2 + 32, height: NODE_R * 2 + 32, top: "50%", left: "50%",
+                  transform: "translate(-50%,-50%)",
+                  background: `radial-gradient(circle, ${aiGlow} 0%, transparent 70%)` }}
+                animate={{ scale: [1, 1.35, 1], opacity: [0.7, 0.1, 0.7] }}
+                transition={{ duration: 1.6, repeat: Infinity }} />
+
+              {/* circle */}
+              <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+                style={{ width: NODE_R * 2 + 8, height: NODE_R * 2 + 8 }}
+                animate={{ borderColor: aiColor,
+                  background: `radial-gradient(circle at 38% 38%, ${aiColor}28, #090910)`,
+                  boxShadow: `0 0 32px ${aiGlow}, 0 0 0 1px ${aiColor}30` }}
+                transition={{ duration: 0.4 }}
+              >
+                <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+                  style={{ background: `linear-gradient(90deg,transparent,${aiColor},transparent)` }}
+                  initial={{ top: "10%" }} animate={{ top: "90%" }}
+                  transition={{ duration: 1.0, repeat: Infinity, ease: "easeInOut" }} />
+
+                <AnimatePresence mode="wait">
+                  <motion.div key={aiPhase} className="flex flex-col items-center"
+                    initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }}
+                    transition={{ duration: 0.25 }}>
+                    <AiIcon className="w-6 h-6 mb-0.5" style={{ color: aiColor }} />
+                    <span className="text-[7px] font-mono font-bold text-center px-1" style={{ color: aiColor }}>
+                      CODE AI
+                    </span>
+                  </motion.div>
+                </AnimatePresence>
+              </motion.div>
+
+              {/* label */}
+              <span className="mt-1.5 text-[11px] font-display font-semibold text-center leading-tight text-white">
+                Code AI
+              </span>
+              <span className="text-[9px] font-display font-light text-center text-gray-400">
+                Assistant
+              </span>
+
+              {/* phase badge */}
+              <AnimatePresence mode="wait">
+                <motion.div key={aiPhase}
+                  className="mt-1.5 px-2 py-0.5 rounded-full border text-[8px] font-mono font-bold tracking-widest"
+                  style={{ borderColor: aiColor + "60", color: aiColor,
+                    background: aiColor + "18", boxShadow: `0 0 8px ${aiGlow}` }}
+                  initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {aiLabel}
+                </motion.div>
+              </AnimatePresence>
+
+              {/* capability rows — visible on hover only */}
+              <AnimatePresence>
+                {hoveredAI && (
+                  <motion.div
+                    className="absolute left-full ml-3 top-1/2 -translate-y-1/2 rounded-2xl border px-3 py-3 flex flex-col gap-2 pointer-events-none z-50"
+                    style={{ borderColor: "#e879f950", background: "#0a0a12",
+                      boxShadow: "0 0 28px rgba(232,121,249,0.3), 0 0 0 1px #e879f920", minWidth: 180 }}
+                    initial={{ opacity: 0, x: -10, scale: 0.92 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -8, scale: 0.92 }}
+                    transition={{ duration: 0.22 }}
+                  >
+                    <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: "#e879f930" }}>
+                      <div className="w-2 h-2 rounded-full" style={{ background: "#e879f9", boxShadow: "0 0 6px #e879f9" }} />
+                      <span className="text-[10px] font-mono font-bold tracking-widest" style={{ color: "#e879f9" }}>
+                        CODE AI CAPABILITIES
+                      </span>
+                    </div>
+                    {([
+                      { Icon: Code2,        label: "Generates Code",   color: "#e879f9", phase: "generating" },
+                      { Icon: FlaskConical, label: "Runs Tests",        color: "#f59e0b", phase: "testing"    },
+                      { Icon: CheckCircle2, label: "Validates Output",  color: "#34d399", phase: "done"       },
+                    ] as const).map(({ Icon, label, color, phase }, idx) => (
+                      <motion.div key={label} className="flex items-center gap-2"
+                        initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.07 }}>
+                        <Icon className="w-3 h-3 shrink-0" style={{ color }} />
+                        <span className="text-[9px] font-mono" style={{ color: aiPhase === phase ? color : color + "99" }}>
+                          {label}
+                        </span>
+                        {aiPhase === phase && (
+                          <motion.div className="w-1 h-1 rounded-full ml-auto shrink-0" style={{ background: color }}
+                            animate={{ scale: [1, 1.8, 1], opacity: [1, 0.3, 1] }}
+                            transition={{ duration: 0.8, repeat: Infinity }} />
+                        )}
+                      </motion.div>
+                    ))}
+                    {/* left caret */}
+                    <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0"
+                      style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent",
+                        borderRight: "6px solid #e879f950" }} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           );
         })()}
+        {/* ── Code Repository node ── */}
+        <motion.div className="absolute flex flex-col items-center"
+          style={{ left: repoPos.cx, top: repoPos.cy, transform: "translate(-50%,-50%)", zIndex: 25 }}
+          initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+        >
+          <motion.div className="absolute rounded-full pointer-events-none"
+            style={{ width: (NODE_R - 4) * 2 + 20, height: (NODE_R - 4) * 2 + 20, top: "50%", left: "50%",
+              transform: "translate(-50%,-50%)", background: "radial-gradient(circle, rgba(52,211,153,0.4) 0%, transparent 70%)" }}
+            animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.1, 0.5] }}
+            transition={{ duration: 2.2, repeat: Infinity }} />
+          <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+            style={{ width: (NODE_R - 4) * 2, height: (NODE_R - 4) * 2 }}
+            animate={{ borderColor: "#34d39990", background: "radial-gradient(circle at 38% 38%, #34d39920, #090910)",
+              boxShadow: "0 0 18px rgba(52,211,153,0.4)" }}>
+            <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{ background: "linear-gradient(90deg,transparent,#34d399,transparent)" }}
+              initial={{ top: "10%" }} animate={{ top: "90%" }}
+              transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }} />
+            <GitBranch className="w-4 h-4 mb-0.5" style={{ color: "#34d399" }} />
+            <span className="text-[6px] font-mono font-bold" style={{ color: "#34d399" }}>REPO</span>
+          </motion.div>
+          <span className="mt-1 text-[9px] font-display font-semibold text-center leading-tight text-white" style={{ maxWidth: 60 }}>
+            Code
+          </span>
+          <span className="text-[9px] font-display font-semibold text-center leading-tight text-white" style={{ maxWidth: 60 }}>
+            Repository
+          </span>
+        </motion.div>
+
+        {/* ── QA AI Engine node ── */}
+        <motion.div className="absolute flex flex-col items-center"
+          style={{ left: qaPos.cx, top: qaPos.cy, transform: "translate(-50%,-50%)", zIndex: 25 }}
+          initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.55 }}
+        >
+          {/* double-ring pulse */}
+          <motion.div className="absolute rounded-full pointer-events-none"
+            style={{ width: (NODE_R - 4) * 2 + 24, height: (NODE_R - 4) * 2 + 24, top: "50%", left: "50%",
+              transform: "translate(-50%,-50%)", background: "radial-gradient(circle, rgba(244,114,182,0.5) 0%, transparent 70%)" }}
+            animate={{ scale: [1, 1.4, 1], opacity: [0.7, 0.1, 0.7] }}
+            transition={{ duration: 1.8, repeat: Infinity }} />
+          <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+            style={{ width: (NODE_R - 4) * 2, height: (NODE_R - 4) * 2 }}
+            animate={{ borderColor: "#f472b6", background: "radial-gradient(circle at 38% 38%, #f472b628, #090910)",
+              boxShadow: "0 0 22px rgba(244,114,182,0.5), 0 0 0 1px #f472b630" }}>
+            <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{ background: "linear-gradient(90deg,transparent,#f472b6,transparent)" }}
+              initial={{ top: "10%" }} animate={{ top: "90%" }}
+              transition={{ duration: 1.0, repeat: Infinity, ease: "easeInOut" }} />
+            <ShieldCheck className="w-4 h-4 mb-0.5" style={{ color: "#f472b6" }} />
+            <span className="text-[6px] font-mono font-bold text-center" style={{ color: "#f472b6" }}>QA AI</span>
+          </motion.div>
+          <span className="mt-1 text-[9px] font-display font-semibold text-center leading-tight text-white" style={{ maxWidth: 60 }}>
+            Quality
+          </span>
+          <span className="text-[9px] font-display font-semibold text-center leading-tight" style={{ maxWidth: 60, color: "#f472b6cc" }}>
+            AI Engine
+          </span>
+        </motion.div>
+
+        {/* ── Product node ── */}
+        <motion.div className="absolute flex flex-col items-center"
+          style={{ left: productPos.cx, top: productPos.cy, transform: "translate(-50%,-50%)", zIndex: 25 }}
+          initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.7 }}
+        >
+          <motion.div className="absolute rounded-full pointer-events-none"
+            style={{ width: (NODE_R - 6) * 2 + 28, height: (NODE_R - 6) * 2 + 28, top: "50%", left: "50%",
+              transform: "translate(-50%,-50%)", background: "radial-gradient(circle, rgba(250,204,21,0.5) 0%, transparent 70%)" }}
+            animate={{ scale: [1, 1.5, 1], opacity: [0.8, 0.15, 0.8] }}
+            transition={{ duration: 2.0, repeat: Infinity }} />
+          <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
+            style={{ width: (NODE_R - 6) * 2, height: (NODE_R - 6) * 2 }}
+            animate={{ borderColor: "#facc15", background: "radial-gradient(circle at 38% 38%, #facc1530, #090910)",
+              boxShadow: "0 0 28px rgba(250,204,21,0.6), 0 0 0 1px #facc1540" }}>
+            <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{ background: "linear-gradient(90deg,transparent,#facc15,transparent)" }}
+              initial={{ top: "10%" }} animate={{ top: "90%" }}
+              transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }} />
+            <Rocket className="w-4 h-4" style={{ color: "#facc15" }} />
+          </motion.div>
+          <span className="mt-1 text-[10px] font-display font-bold text-center leading-tight"
+            style={{ color: "#facc15", maxWidth: 56, textShadow: "0 0 12px rgba(250,204,21,0.6)" }}>
+            Product
+          </span>
+        </motion.div>
+
+        <div className="absolute bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30">
+          {Array.from({ length: N_FU }, (_, i) => (
+            <motion.button key={i}
+              className="px-3 py-1 rounded-full border text-[9px] font-mono font-bold tracking-widest cursor-pointer"
+              style={{
+                borderColor: activeFU === i ? FU_COLORS[i] : "rgba(255,255,255,0.1)",
+                color: activeFU === i ? FU_COLORS[i] : "#4b5563",
+                background: activeFU === i ? FU_COLORS[i] + "18" : "transparent",
+                boxShadow: activeFU === i ? `0 0 12px ${FU_GLOWS[i]}` : "none",
+              }}
+              animate={{ scale: activeFU === i ? 1.08 : 1 }}
+              onClick={() => { setActiveFU(i); setAutoRun(false); }}>
+              FU-{i + 1}
+            </motion.button>
+          ))}
+          <span className="text-[9px] font-mono text-gray-600 ml-1">· · · N</span>
+        </div>
       </div>
 
       {/* Footer */}
@@ -405,14 +947,18 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
         <div className="flex items-center gap-2">
           <motion.div className="w-1.5 h-1.5 rounded-full"
             style={{ background: autoRun ? "#34d399" : "#6b7280" }}
-            animate={autoRun ? { scale:[1,1.7,1], opacity:[1,0.3,1] } : {}}
-            transition={{ duration:1.1, repeat:Infinity }} />
+            animate={autoRun ? { scale: [1, 1.7, 1], opacity: [1, 0.3, 1] } : {}}
+            transition={{ duration: 1.1, repeat: Infinity }} />
           <span className="text-[9px] font-mono tracking-widest text-gray-500 uppercase">
-            {autoRun ? "Auto-walking nodes" : `Node ${active+1} / ${NODES.length} — click or hover any node`}
+            {autoRun ? "Auto-cycling functional units" : "Hover or click a Functional Unit to expand"}
           </span>
         </div>
         <p className="text-[10px] font-display font-light text-gray-500">
-          "From intent to <span className="text-white font-medium">governed delivery</span>."
+          <span className="text-[#34d399] font-medium">Repo</span>
+          {" → "}
+          <span className="text-[#f472b6] font-medium">QA AI Engine</span>
+          {" → "}
+          <span className="text-[#facc15] font-medium">Product</span>
         </p>
       </div>
     </div>
