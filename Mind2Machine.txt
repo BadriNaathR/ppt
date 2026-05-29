@@ -555,12 +555,12 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
               <AnimatePresence>
                 {isHov && (
                   <motion.div
-                    className={`absolute ${i === 0 ? 'top-full mt-3' : 'bottom-full mb-3'} left-1/2 rounded-2xl border px-3 py-3 flex flex-col gap-2 pointer-events-none z-50`}
-                    style={{ x: "-50%", borderColor: color + "50", background: "#0a0a12",
+                    className="absolute left-full ml-3 top-1/2 rounded-2xl border px-3 py-3 flex flex-col gap-2 pointer-events-none z-[60]"
+                    style={{ y: "-50%", borderColor: color + "50", background: "#0a0a12",
                       boxShadow: `0 0 28px ${glow}, 0 0 0 1px ${color}20`, minWidth: 200 }}
-                    initial={{ opacity: 0, y: i === 0 ? -10 : 10, scale: 0.92 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: i === 0 ? -8 : 8, scale: 0.92 }}
+                    initial={{ opacity: 0, x: -10, scale: 0.92 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -8, scale: 0.92 }}
                     transition={{ duration: 0.22 }}
                   >
                     {/* header */}
@@ -592,16 +592,10 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                       ))}
                     </div>
 
-                    {/* caret — top for FU-1 (points up), bottom for others (points down) */}
-                    {i === 0 ? (
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0"
-                        style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
-                          borderBottom: `6px solid ${color}50` }} />
-                    ) : (
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
-                        style={{ borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
-                          borderTop: `6px solid ${color}50` }} />
-                    )}
+                    {/* left caret pointing back to node */}
+                    <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0"
+                      style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent",
+                        borderRight: `6px solid ${color}50` }} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -854,7 +848,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
               <AnimatePresence>
                 {hoveredAI && (
                   <motion.div
-                    className="absolute left-full ml-3 rounded-2xl border px-3 py-3 flex flex-col gap-2 pointer-events-none z-50"
+                    className="absolute left-full ml-3 rounded-2xl border px-3 py-3 flex flex-col gap-2 pointer-events-none z-[60]"
                     style={{ y: "-50%", borderColor: "#e879f950", background: "#0a0a12",
                       boxShadow: "0 0 28px rgba(232,121,249,0.3), 0 0 0 1px #e879f920", minWidth: 180 }}
                     initial={{ opacity: 0, x: -10, scale: 0.92 }}
@@ -990,7 +984,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
           <div
             key={gate.id}
             className="absolute"
-            style={{ left: gate.cx, top: gate.cy, transform: "translate(-50%, -50%)", zIndex: 45 }}
+            style={{ left: gate.cx, top: gate.cy, transform: "translate(-50%, -50%)", zIndex: 15 }}
             onMouseEnter={() => setHoveredGate(gate.id)}
             onMouseLeave={() => setHoveredGate(null)}
           >
@@ -1027,7 +1021,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
               <AnimatePresence>
                 {hoveredGate === gate.id && (
                   <motion.div
-                    className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 rounded-xl border border-cyan-500/30 bg-[#061117]/95 backdrop-blur-md px-3 py-2.5 flex flex-col gap-1.5 pointer-events-none z-50 shadow-[0_15px_30px_rgba(0,0,0,0.7),0_0_18px_rgba(34,211,238,0.25)]"
+                    className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 rounded-xl border border-cyan-500/30 bg-[#061117]/95 backdrop-blur-md px-3 py-2.5 flex flex-col gap-1.5 pointer-events-none z-[70] shadow-[0_15px_30px_rgba(0,0,0,0.7),0_0_18px_rgba(34,211,238,0.25)]"
                     style={{ minWidth: 170 }}
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
