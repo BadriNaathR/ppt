@@ -132,10 +132,10 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
   const intakeVisualPos: Pos = { cx: cpx(5),  cy: cpy(42) };
   const intakePos: Pos = intakeVisualPos;
   const splitPos:  Pos = { cx: cpx(14), cy: cpy(42) };
-  const fuPos  = (i: number): Pos => ({ cx: cpx(26), cy: cpy([18, 34, 50, 66][i]) });
-  const tuPos   = (fi: number, ti: number): Pos => ({ cx: cpx(37), cy: cpy([18, 34, 50, 66][fi] + [-8, 0, 8][ti]) });
-  const specPos  = (fi: number, ti: number): Pos => ({ cx: cpx(48), cy: cpy([18, 34, 50, 66][fi] + [-8, 0, 8][ti]) });
-  const dslPos   = (fi: number, ti: number): Pos => ({ cx: cpx(58), cy: cpy([18, 34, 50, 66][fi] + [-8, 0, 8][ti]) });
+  const fuPos  = (i: number): Pos => ({ cx: cpx(26), cy: cpy([12, 32, 54, 74][i]) });
+  const tuPos   = (fi: number, ti: number): Pos => ({ cx: cpx(37), cy: cpy([12, 32, 54, 74][fi] + [-14, 0, 14][ti]) });
+  const specPos  = (fi: number, ti: number): Pos => ({ cx: cpx(48), cy: cpy([12, 32, 54, 74][fi] + [-14, 0, 14][ti]) });
+  const dslPos   = (fi: number, ti: number): Pos => ({ cx: cpx(58), cy: cpy([12, 32, 54, 74][fi] + [-14, 0, 14][ti]) });
   const aiPos: Pos      = { cx: cpx(68), cy: cpy(42) };
   const designPos: Pos  = { cx: cpx(68), cy: cpy(8) };
   const designVisualPos: Pos = { cx: cpx(68), cy: cpy(8) };
@@ -145,53 +145,54 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
   const qaPos: Pos      = { cx: cpx(87), cy: cpy(42) };
   const productPos: Pos = { cx: cpx(96), cy: cpy(42) };
 
+  const GATE_LIFT = cpy(5); // shift all gates upward by 6% of container height
   const gates = [
     {
       id: 0,
       cx: splitPos.cx + (fuPos(focusFU).cx - splitPos.cx) * 0.5,
-      cy: splitPos.cy + (fuPos(focusFU).cy - splitPos.cy) * 0.5,
+      cy: splitPos.cy + (fuPos(focusFU).cy - splitPos.cy) * 0.5 - GATE_LIFT,
       label: "Story Sign-off",
       desc: "Governor verifies backlog scope, user journey alignment and allocation bounds after AI logical split."
     },
     {
       id: 1,
       cx: fuPos(focusFU).cx + (tuPos(focusFU, 1).cx - fuPos(focusFU).cx) * 0.5,
-      cy: fuPos(focusFU).cy,
+      cy: fuPos(focusFU).cy - GATE_LIFT,
       label: "Architecture Sign-off",
       desc: "Lead Architect audits the technical unit decomposition of the functional unit (e.g., Auth Module, Role Engine, Session Mgr) to assure correct modular separation and design."
     },
     {
       id: 2,
       cx: tuPos(focusFU, 1).cx + (specPos(focusFU, 1).cx - tuPos(focusFU, 1).cx) * 0.5,
-      cy: fuPos(focusFU).cy,
+      cy: fuPos(focusFU).cy - GATE_LIFT,
       label: "AI Spec Review",
       desc: "Generated micro-level code specifications (spec.md) are audited for system features and limits."
     },
     {
       id: 3,
       cx: specPos(focusFU, 1).cx + (dslPos(focusFU, 1).cx - specPos(focusFU, 1).cx) * 0.5,
-      cy: fuPos(focusFU).cy,
+      cy: fuPos(focusFU).cy - GATE_LIFT,
       label: "Blueprint Review",
       desc: "Declarative AST database schemas and state transition blueprints are signed off before synthesization."
     },
     {
       id: 4,
       cx: aiPos.cx + (repoPos.cx - aiPos.cx) * 0.5,
-      cy: aiPos.cy,
+      cy: aiPos.cy - GATE_LIFT,
       label: "PR Sign-off",
       desc: "Compiler checks, automated test suites, and codebase structure are vetted on the AI development branch."
     },
     {
       id: 5,
       cx: repoPos.cx + (qaPos.cx - repoPos.cx) * 0.5,
-      cy: repoPos.cy,
+      cy: repoPos.cy - GATE_LIFT,
       label: "QA Verification",
       desc: "Sovereign reviewer audits vulnerabilities, architectural integrity, and Git history compliance."
     },
     {
       id: 6,
       cx: qaPos.cx + (productPos.cx - qaPos.cx) * 0.55,
-      cy: qaPos.cy,
+      cy: qaPos.cy - GATE_LIFT,
       label: "Deployment Release",
       desc: "Release manager authorizes live production sandbox deployment to Cloud Run containers."
     }
@@ -293,7 +294,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                   color={FU_COLORS[i]} live={live} thick={live} />
                 {live && (
                   <text x={e.mx + e.perpX} y={e.my + e.perpY - 5} textAnchor="middle"
-                    fontSize="11" fontFamily="JetBrains Mono,monospace" fontWeight="700"
+                    fontSize="9" fontFamily="JetBrains Mono,monospace" fontWeight="700"
                     fill={FU_COLORS[i]} style={{ filter: `drop-shadow(0 0 4px ${FU_COLORS[i]})` }}>
                     Logical Split
                   </text>
@@ -321,7 +322,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                 <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
                   color={FU_COLORS[focusFU]} live={true} />
                 {ti === 1 && (
-                  <text x={e.mx} y={e.my - 6} textAnchor="middle"
+                  <text x={e.mx} y={e.my + 15} textAnchor="middle"
                     fontSize="10" fontFamily="JetBrains Mono,monospace" fontWeight="700"
                     fill={FU_COLORS[focusFU] + "cc"}>
                     generates
@@ -339,7 +340,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                 <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
                   color="#a78bfa" live={true} />
                 {ti === 1 && (
-                  <text x={e.mx} y={e.my - 6} textAnchor="middle"
+                  <text x={e.mx} y={e.my + 15} textAnchor="middle"
                     fontSize="10" fontFamily="JetBrains Mono,monospace" fontWeight="700"
                     fill="#a78bfacc">
                     converts
@@ -358,7 +359,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                 <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
                   color={aiColor} live={true} thick={ti === 1} />
                 {ti === 1 && (
-                  <text x={e.mx} y={e.my - 6} textAnchor="middle"
+                  <text x={e.mx - 20} y={e.my - 6} textAnchor="middle"
                     fontSize="10" fontFamily="JetBrains Mono,monospace" fontWeight="700"
                     fill={aiColor + "cc"}>
                     all DSLs
@@ -402,7 +403,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
             return (
               <g>
                 <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#34d399" live={aiPhase === "done"} thick={true} />
-                <text x={e.mx} y={e.my - 8} textAnchor="middle"
+                <text x={e.mx} y={e.my + 15} textAnchor="middle"
                   fontSize="10" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#34d399cc">
                   commit
                 </text>
@@ -416,7 +417,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
             return (
               <g>
                 <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#f472b6" live={true} thick={true} />
-                <text x={e.mx} y={e.my - 8} textAnchor="middle"
+                <text x={e.mx} y={e.my + 15} textAnchor="middle"
                   fontSize="10" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#f472b6cc">
                   scan
                 </text>
@@ -430,7 +431,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
             return (
               <g>
                 <EdgeLine x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} color="#facc15" live={true} thick={true} />
-                <text x={e.mx} y={e.my - 8} textAnchor="middle"
+                <text x={e.mx} y={e.my + 15} textAnchor="middle"
                   fontSize="10" fontFamily="JetBrains Mono,monospace" fontWeight="700" fill="#facc15cc">
                   ship
                 </text>
@@ -543,8 +544,8 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
               </motion.div>
 
               {/* label */}
-              <motion.span className="mt-1.5 text-[12px] font-display font-semibold text-center leading-tight whitespace-pre-line"
-                style={{ maxWidth: 88 }}
+              <motion.span className="mt-1 text-[10px] font-display font-semibold text-center leading-tight whitespace-pre-line"
+                style={{ maxWidth: 72 }}
                 animate={{ color: isFocus || isHov ? "#fff" : "#6b7280" }}
                 transition={{ duration: 0.3 }}>
                 {FU_LABELS[i]}
@@ -625,28 +626,28 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
               >
                 {/* glow ring */}
                 <motion.div className="absolute rounded-full pointer-events-none"
-                  style={{ width: (NODE_R - 4) * 2 + 16, height: (NODE_R - 4) * 2 + 16,
+                  style={{ width: (NODE_R - 8) * 2 + 14, height: (NODE_R - 8) * 2 + 14,
                     top: "50%", left: "50%", x: "-50%", y: "-50%",
                     background: `radial-gradient(circle, ${glow} 0%, transparent 70%)` }}
                   animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.1, 0.4] }}
                   transition={{ duration: 2.2, repeat: Infinity, delay: ti * 0.4 }} />
 
                 <motion.div className="relative flex flex-col items-center justify-center rounded-full border-2 overflow-hidden"
-                  style={{ width: (NODE_R - 4) * 2, height: (NODE_R - 4) * 2 }}
+                  style={{ width: (NODE_R - 8) * 2, height: (NODE_R - 8) * 2 }}
                   animate={{ borderColor: color + "90", background: `radial-gradient(circle at 38% 38%, ${color}20, #090910)`,
                     boxShadow: `0 0 14px ${glow}` }}>
                   <motion.div className="absolute left-0 right-0 h-px pointer-events-none"
                     style={{ background: `linear-gradient(90deg,transparent,${color},transparent)` }}
                     initial={{ top: "10%" }} animate={{ top: "90%" }}
                     transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut", delay: ti * 0.3 }} />
-                  <Wrench className="w-3.5 h-3.5 mb-0.5" style={{ color }} />
-                  <span className="text-[7px] font-mono font-bold" style={{ color }}>
+                  <Wrench className="w-3 h-3 mb-0.5" style={{ color }} />
+                  <span className="text-[6px] font-mono font-bold" style={{ color }}>
                     TU-{String(ti + 1).padStart(2, "0")}
                   </span>
                 </motion.div>
 
-                <motion.span className="mt-1 text-[10px] font-display font-semibold text-center leading-tight"
-                  style={{ maxWidth: 76, color: color + "ee" }}>
+                <motion.span className="mt-0.5 text-[9px] font-display font-semibold text-center leading-none"
+                  style={{ maxWidth: 60, color: color + "ee" }}>
                   {TU_LABELS[focusFU][ti]}
                 </motion.span>
               </motion.div>
@@ -679,7 +680,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                     transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut", delay: ti * 0.25 }} />
                   <FileCode className="w-4 h-4" style={{ color }} />
                 </motion.div>
-                <motion.span className="mt-1 text-[10px] font-mono font-bold text-center"
+                <motion.span className="mt-0.5 text-[9px] font-mono font-bold text-center leading-none"
                   style={{ color: color + "ee" }}>
                   spec.md
                 </motion.span>
@@ -711,7 +712,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                     transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut", delay: ti * 0.25 }} />
                   <Code2 className="w-4 h-4" style={{ color: "#a78bfa" }} />
                 </motion.div>
-                <motion.span className="mt-1 text-[10px] font-mono font-bold text-center"
+                <motion.span className="mt-0.5 text-[9px] font-mono font-bold text-center leading-none"
                   style={{ color: "#a78bfaee" }}>
                   dsl.yaml
                 </motion.span>
@@ -994,6 +995,10 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
             onMouseLeave={() => setHoveredGate(null)}
           >
             <div className="relative flex flex-col items-center">
+              {/* Mini Label */}
+              <span className="mt-0 text-[8px] font-mono font-bold tracking-wider text-cyan-400/80 uppercase whitespace-nowrap bg-black/60 px-1 py-0.5 rounded border border-cyan-500/10">
+                {gate.label}
+              </span>
               {/* Pulsing neon outer glow */}
               <motion.div 
                 className="absolute rounded-full border border-cyan-400/30"
@@ -1011,15 +1016,12 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
                 <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
                 
                 {/* HITL Tiny tag */}
-                <div className="absolute -top-3.5 px-0.5 py-px bg-cyan-950/90 border border-cyan-500/40 rounded text-[5px] font-mono font-bold tracking-wider text-cyan-300 scale-90">
+                {/* <div className="absolute -top-3.5 px-0.5 py-px bg-cyan-950/90 border border-cyan-500/40 rounded text-[5px] font-mono font-bold tracking-wider text-cyan-300 scale-90">
                   HITL
-                </div>
+                </div> */}
               </motion.div>
 
-              {/* Mini Label */}
-              <span className="mt-1 text-[8px] font-mono font-bold tracking-wider text-cyan-400/80 uppercase whitespace-nowrap bg-black/60 px-1 py-0.5 rounded border border-cyan-500/10">
-                {gate.label}
-              </span>
+              
 
               {/* Hover card */}
               <AnimatePresence>
@@ -1072,7 +1074,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
       </div>
 
       {/* Footer */}
-      <div className="relative z-10 flex items-center justify-between border-t border-white/[0.04] pt-2">
+      {/* <div className="relative z-10 flex items-center justify-between border-t border-white/[0.04] pt-2">
         <div className="flex items-center gap-2">
           <motion.div className="w-1.5 h-1.5 rounded-full"
             style={{ background: autoRun ? "#34d399" : "#6b7280" }}
@@ -1089,7 +1091,7 @@ export default function SlideCodeDevelopment({ isActive }: SlideProps) {
           {" → "}
           <span className="text-[#facc15] font-medium">Product</span>
         </p>
-      </div>
+      </div> */}
     </div>
   );
 }
